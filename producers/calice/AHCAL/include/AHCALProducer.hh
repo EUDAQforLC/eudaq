@@ -59,6 +59,7 @@ namespace eudaq {
     std::mutex _mufd;
       
     bool _running;
+    bool _stopped;
     bool _configured;
 
     // debug output

@@ -27,7 +27,8 @@ using namespace std;
 namespace eudaq {
 
   AHCALProducer::AHCALProducer(const std::string & name, const std::string & runcontrol) :
-    Producer(name, runcontrol), _runNo(0), _eventNo(0), _fd(0), _running(false), _configured(false)
+    Producer(name, runcontrol), _runNo(0), _eventNo(0), _fd(0), _running(false), _stopped(true), _configured(false)
+
   {
 
   }
@@ -77,7 +78,7 @@ namespace eudaq {
     std::cout << "Start Run: " << param << std::endl;
     SetStatus(eudaq::Status::LVL_OK, "");
     _running = true;
-
+    _stopped = false;
 
   }
 
@@ -119,17 +120,14 @@ namespace eudaq {
 
     _reader->OnStop(_waitsecondsForQueuedEvents);
     _running = false;
-    sleep(1); 
-    // Sleep added to fix a bug.
-    // Error:  uncaught exception: Deserialize asked for X only have Y
-    // sometimes appears when stopping the run and events are in the queue are being read
-    // this crashes the Labview
-    // seems to be a race condition, 
-    // for the moment fixed with this extra time after (1s) of sleep after the stop.
-    // following https://github.com/eudaq/eudaq/issues/29
+    while (_stopped == false) {
+      eudaq::mSleep(100);
+    }
+
     if(_writeRaw)
       _rawFile.close();
 
+    SetStatus(eudaq::Status::LVL_OK, "");
   }
 
   bool AHCALProducer::OpenConnection()
@@ -216,8 +214,17 @@ namespace eudaq {
       if(size == -1 || size == 0){
         if(size == -1)
           std::cout << "Error on read: " << errno << " Disconnect and going to the waiting mode." << endl;
-        else
-          std::cout << "Socket disconnected. going to the waiting mode." << endl;         
+        else {
+          std::cout << "Socket disconnected. going to the waiting mode." << endl;         	    
+	  if(!_running && _stopped==false) {
+	    _stopped=true;
+	    deqEvent=sendallevents(deqEvent,0);
+	    
+	    SendEvent(RawDataEvent::EORE("CaliceObject", _runNo, _eventNo));
+	    bufRead.clear();
+	    deqEvent.clear();
+	  }
+	}
         close(_fd);
         _fd = -1;
 	continue;
