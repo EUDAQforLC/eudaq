@@ -171,7 +171,7 @@ namespace eudaq {
         }
         StandardPlane plane(id, "NI", "MIMOSA26");
         plane.SetSizeZS(1152, 576, 0, 2, StandardPlane::FLAG_WITHPIVOT |
-                                             StandardPlane::FLAG_DIFFCOORDS);
+			StandardPlane::FLAG_DIFFCOORDS);
         plane.SetTLUEvent(tluid);
         plane.SetPivotPixel((9216 + pivot + PIVOTPIXELOFFSET) % 9216);
         DecodeFrame(plane, len0, it0 + 8, 0);
@@ -293,28 +293,15 @@ namespace eudaq {
     virtual void GetLCIORunHeader(lcio::LCRunHeader & /*header*/,
                                   eudaq::Event const & /*bore*/,
                                   eudaq::Configuration const & /*conf*/) const;
+#endif
+
+#if USE_LCIO 
     virtual bool GetLCIOSubEvent(lcio::LCEvent &result,
                                  const Event &source) const;
 #endif
 
   protected:
-    // static size_t GetID(const Event & event, size_t i) {
-    //  if (const RawDataEvent * ev = dynamic_cast<const RawDataEvent
-    //  *>(&event)) {
-    //    return ev->GetID(i);
-    //  }
-    //  return 0;
-    //}
-    // static size_t NumPlanes(const Event & event) {
-    //  const RawDataEvent & rawev = dynamic_cast<const RawDataEvent &>(ev);
-    //  if (rawev.NumBlocks() < 1) return 0;
-    //  const std::vector<unsigned char> & data = rawev.GetBlock(0);
-    //  size_t offset = 2, result = 0;
-    //  while (data.size()/4 >= offset + 3) {
-    //    unsigned len = GET(data, offset + 1) & 0xffff;
-    //    offset += len + 4;
-    //  }
-    //}
+
   private:
     NIConverterPlugin() : DataConverterPlugin("NI"), m_boards(0) {}
     unsigned m_boards;
@@ -326,8 +313,8 @@ namespace eudaq {
 
 #if USE_LCIO && USE_EUTELESCOPE
   void NIConverterPlugin::GetLCIORunHeader(
-      lcio::LCRunHeader &header, eudaq::Event const & /*bore*/,
-      eudaq::Configuration const & /*conf*/) const {
+					   lcio::LCRunHeader &header, eudaq::Event const & /*bore*/,
+					   eudaq::Configuration const & /*conf*/) const {
     eutelescope::EUTelRunHeaderImpl runHeader(&header);
     runHeader.setDAQHWName(EUTELESCOPE::EUDRB); // should be:
     // runHeader.setDAQHWName(EUTELESCOPE::NI);
@@ -340,15 +327,20 @@ namespace eudaq {
     runHeader.setEUDRBDet("MIMOSA26");
     runHeader.setNoOfDetector(m_boards);
     std::vector<int> xMin(m_boards, 0), xMax(m_boards, 1151), yMin(m_boards, 0),
-        yMax(m_boards, 575);
+      yMax(m_boards, 575);
     runHeader.setMinX(xMin);
     runHeader.setMaxX(xMax);
     runHeader.setMinY(yMin);
     runHeader.setMaxY(yMax);
   }
+#endif
 
+#if USE_LCIO 
   bool NIConverterPlugin::GetLCIOSubEvent(lcio::LCEvent &result,
                                           const Event &source) const {
+
+    TrackerDataImpl *zsFrame;
+
     if (source.IsBORE()) {
       if (dbg > 0)
         std::cout << "NIConverterPlugin::GetLCIOSubEvent BORE " << std::endl;
@@ -364,17 +356,15 @@ namespace eudaq {
 
     if (dbg > 0)
       std::cout << "NIConverterPlugin::GetLCIOSubEvent data " << std::endl;
-    result.parameters().setValue(eutelescope::EUTELESCOPE::EVENTTYPE,
-                                 eutelescope::kDE);
-
+ 
     // prepare the collections for the rawdata and the zs ones
     LCCollectionVec *rawDataCollection, *zsDataCollection, *zs2DataCollection;
     bool rawDataCollectionExists = false, zsDataCollectionExists = false,
-         zs2DataCollectionExists = false;
+      zs2DataCollectionExists = false;
 
     try {
       rawDataCollection =
-          static_cast<LCCollectionVec *>(result.getCollection("rawdata"));
+	static_cast<LCCollectionVec *>(result.getCollection("rawdata"));
       rawDataCollectionExists = true;
     } catch (lcio::DataNotAvailableException &e) {
       rawDataCollection = new LCCollectionVec(lcio::LCIO::TRACKERRAWDATA);
@@ -382,7 +372,7 @@ namespace eudaq {
 
     try {
       zsDataCollection =
-          static_cast<LCCollectionVec *>(result.getCollection("zsdata"));
+	static_cast<LCCollectionVec *>(result.getCollection("zsdata"));
       zsDataCollectionExists = true;
     } catch (lcio::DataNotAvailableException &e) {
       zsDataCollection = new LCCollectionVec(lcio::LCIO::TRACKERDATA);
@@ -390,22 +380,27 @@ namespace eudaq {
 
     try {
       zs2DataCollection =
-          static_cast<LCCollectionVec *>(result.getCollection("zsdata_m26"));
+	static_cast<LCCollectionVec *>(result.getCollection("zsdata_m26"));
       zs2DataCollectionExists = true;
     } catch (lcio::DataNotAvailableException &e) {
       zs2DataCollection = new LCCollectionVec(lcio::LCIO::TRACKERDATA);
     }
 
+    //airqui
+    //Manually set the variables for encoding:
+    const char *   MATRIXDEFAULTENCODING    = "sensorID:5,xMin:12,xMax:12,yMin:12,yMax:12";
+    const char *   ZSDATADEFAULTENCODING    = "sensorID:7,sparsePixelType:5";
+
     // set the proper cell encoder
     CellIDEncoder<TrackerRawDataImpl> rawDataEncoder(
-        eutelescope::EUTELESCOPE::MATRIXDEFAULTENCODING, rawDataCollection);
+						     MATRIXDEFAULTENCODING, rawDataCollection);
     CellIDEncoder<TrackerDataImpl> zsDataEncoder(
-        eutelescope::EUTELESCOPE::ZSDATADEFAULTENCODING, zsDataCollection);
+						 ZSDATADEFAULTENCODING, zsDataCollection);
     CellIDEncoder<TrackerDataImpl> zs2DataEncoder(
-        eutelescope::EUTELESCOPE::ZSDATADEFAULTENCODING, zs2DataCollection);
+						  ZSDATADEFAULTENCODING, zs2DataCollection);
 
     // a description of the setup
-    std::vector<eutelescope::EUTelSetupDescription *> setupDescription;
+    //   std::vector<eutelescope::EUTelSetupDescription *> setupDescription;
 
     // to understand if we have problem with de-syncronisation, let
     // me prepare a Boolean switch and a vector of size_t to contain the
@@ -415,10 +410,10 @@ namespace eudaq {
 
     if (dbg > 0)
       std::cout
-          << "NIConverterPlugin::GetLCIOSubEvent rawDataEvent with boards="
-          << m_boards << std::endl;
+	<< "NIConverterPlugin::GetLCIOSubEvent rawDataEvent with boards="
+	<< m_boards << std::endl;
     const RawDataEvent &rawDataEvent =
-        dynamic_cast<const RawDataEvent &>(source);
+      dynamic_cast<const RawDataEvent &>(source);
 
     size_t numplanes = m_boards; // NumPlanes(source);
 
@@ -434,9 +429,11 @@ namespace eudaq {
         std::cout << "setting plane #  " << iPlane << " out of " << numplanes
                   << " up to " << tmp_evt.NumPlanes() << std::endl;
       StandardPlane plane =
-          static_cast<StandardPlane>(tmp_evt.GetPlane(iPlane));
+	static_cast<StandardPlane>(tmp_evt.GetPlane(iPlane));
 
       // The current detector is ...
+#if USE_LCIO && USE_EUTELESCOPE
+
       eutelescope::EUTelPixelDetector *currentDetector = 0x0;
       if (plane.Sensor() == "MIMOTEL") {
 
@@ -446,7 +443,7 @@ namespace eudaq {
         currentDetector->setMode(mode);
         if (result.getEventNumber() == 0) {
           setupDescription.push_back(
-              new eutelescope::EUTelSetupDescription(currentDetector));
+				     new eutelescope::EUTelSetupDescription(currentDetector));
         }
       } else if (plane.Sensor() == "MIMOSA18") {
 
@@ -456,7 +453,7 @@ namespace eudaq {
         currentDetector->setMode(mode);
         if (result.getEventNumber() == 0) {
           setupDescription.push_back(
-              new eutelescope::EUTelSetupDescription(currentDetector));
+				     new eutelescope::EUTelSetupDescription(currentDetector));
         }
       } else if (plane.Sensor() == "MIMOSA26") {
 
@@ -465,7 +462,7 @@ namespace eudaq {
         currentDetector->setMode(mode);
         if (result.getEventNumber() == 0) {
           setupDescription.push_back(
-              new eutelescope::EUTelSetupDescription(currentDetector));
+				     new eutelescope::EUTelSetupDescription(currentDetector));
         }
       } else {
 
@@ -474,279 +471,83 @@ namespace eudaq {
         return true;
       }
       std::vector<size_t> markerVec = currentDetector->getMarkerPosition();
+#endif
 
-      if (plane.GetFlags(StandardPlane::FLAG_ZS)) {
+      //if (plane.GetFlags(StandardPlane::FLAG_ZS)) {
         zsDataEncoder["sensorID"] = plane.ID();
-        zsDataEncoder["sparsePixelType"] =
-            eutelescope::kEUTelGenericSparsePixel;
+        zsDataEncoder["sparsePixelType"] = 2 ; //airqui hardcoded eutelescope::kEUTelGenericSparsePixel;
 
         // get the total number of pixel. This is written in the
         // eudrbBoard and to get it in a easy way pass through the eudrbDecoder
         size_t nPixel = plane.HitPixels();
 
         // prepare a new TrackerData for the ZS data
-        std::auto_ptr<lcio::TrackerDataImpl> zsFrame(new lcio::TrackerDataImpl);
-        zsDataEncoder.setCellID(zsFrame.get());
+	zsFrame= new TrackerDataImpl;
+        zsDataEncoder.setCellID(zsFrame);
 
-        // this is the structure that will host the sparse pixel
-        std::auto_ptr<eutelescope::EUTelTrackerDataInterfacerImpl<
-            eutelescope::EUTelGenericSparsePixel>>
-            sparseFrame(new eutelescope::EUTelTrackerDataInterfacerImpl<
-                eutelescope::EUTelGenericSparsePixel>(zsFrame.get()));
+	for(int i=0; i<  plane.HitPixels() ; i++) {
+	  std::cout<<plane.GetX(i)<< "    " <<plane.GetY(i)<<" "<< plane.ID()<<" "<< plane.Sensor()<<std::endl;
+	  
+	  zsFrame->chargeValues().push_back(plane.GetX(i));
+	  zsFrame->chargeValues().push_back(plane.GetY(i));
+	  zsFrame->chargeValues().push_back(1);
+	  zsFrame->chargeValues().push_back(0);
+	}
+	zsDataCollection->push_back( zsFrame);
 
-        // prepare a sparse pixel to be added to the sparse data
-        std::auto_ptr<eutelescope::EUTelGenericSparsePixel> sparsePixel(
-            new eutelescope::EUTelGenericSparsePixel);
-        for (size_t iPixel = 0; iPixel < nPixel; ++iPixel) {
-
-          // the data contain also the markers, so we have to strip
-          // them out. First I need to have the original position
-          // (with markers in) and then calculate how many pixels I
-          // have to remove
-          size_t originalX = (size_t)plane.GetX(iPixel);
-
-          if (find(markerVec.begin(), markerVec.end(), originalX) ==
-              markerVec.end()) {
-            // the original X is not on a marker column, so I need
-            // to remove a certain number of pixels depending on the
-            // position
-
-            // this counts the number of markers found on the left
-            // of the original X
-            short diff =
-                (short)count_if(markerVec.begin(), markerVec.end(),
-                                std::bind2nd(std::less<short>(), originalX));
-            sparsePixel->setXCoord(originalX - diff);
-
-            // no problem instead with the Y coordinate
-            sparsePixel->setYCoord((size_t)plane.GetY(iPixel));
-
-            // last the pixel charge. The CDS is automatically
-            // calculated by the EUDRB
-            sparsePixel->setSignal((size_t)plane.GetPixel(iPixel));
-
-            // in case of DEBUG
-            // streamlog_out ( DEBUG0 ) << ( *(sparsePixel.get() ) ) << endl;
-
-            // now add this pixel to the sparse frame
-            sparseFrame->addSparsePixel(sparsePixel.get());
-          } else {
-            // the original X was on a marker column, so we don't
-            // need to process this pixel any further and of course
-            // we don't have to add it to the sparse frame.
-
-            /*
-               streamlog_out ( DEBUG0 ) << "Found a sparse pixel ("<< iPixel
-               <<")  on a marker column. Not adding it to the frame" << endl
-               << (* (sparsePixel.get() ) ) << endl;
-             */
-          }
-        }
-
-        // perfect! Now add the TrackerData to the collection
-        if (plane.Sensor() == "MIMOSA26") {
-          zs2DataCollection->push_back(zsFrame.release());
-        } else {
-          zsDataCollection->push_back(zsFrame.release());
-        }
-
-        // for the debug of the synchronization
-        pivotPixelPosVec.push_back(plane.PivotPixel());
-
-      } else {
-
-        // storage of RAW data is done here according to the mode
-        rawDataEncoder["xMin"] = currentDetector->getXMin();
-        rawDataEncoder["xMax"] = currentDetector->getXMax() - markerVec.size();
-        rawDataEncoder["yMin"] = currentDetector->getYMin();
-        rawDataEncoder["yMax"] = currentDetector->getYMax();
-        rawDataEncoder["sensorID"] = plane.ID();
-
-        // get the full vector of CDS
-        std::vector<short> cdsVec = plane.GetPixels<short>();
-
-        // now we have to strip out the marker cols from the CDS
-        // value. To do this I need a vector of short large enough
-        // to accommodate the full matrix without the markers
-        std::vector<short> cdsStrippedVec(
-            currentDetector->getYNoOfPixel() *
-            (currentDetector->getXNoOfPixel() - markerVec.size()));
-
-        // I need also two iterators, one for the stripped vec and
-        // one for the original one.
-        std::vector<short>::iterator currentCDSPos = cdsStrippedVec.begin();
-        std::vector<short>::iterator cdsBegin = cdsVec.begin();
-
-        // now loop over all the pixels
-        for (size_t y = 0; y < currentDetector->getYNoOfPixel(); ++y) {
-          size_t offset = y * currentDetector->getXNoOfPixel();
-          std::vector<size_t>::iterator marker = markerVec.begin();
-
-          // first copy from the beginning of the row to the first
-          // marker column
-          currentCDSPos = copy(cdsBegin + offset,
-                               cdsBegin + (*(marker) + offset), currentCDSPos);
-
-          // now copy from the next column to the next marker into a
-          // while loop
-          while (marker != markerVec.end()) {
-            if (marker < markerVec.end() - 1) {
-              currentCDSPos =
-                  copy(cdsBegin + (*(marker) + 1 + offset),
-                       cdsBegin + (*(marker + 1) + offset), currentCDSPos);
-            } else {
-              // now from the last marker column to the end of the
-              // row
-              currentCDSPos =
-                  copy(cdsBegin + (*(marker) + 1 + offset),
-                       cdsBegin + offset + currentDetector->getXNoOfPixel(),
-                       currentCDSPos);
-            }
-            ++marker;
-          }
-        }
-
-        // this is the right place to prepare the TrackerRawData
-        // object
-        std::auto_ptr<lcio::TrackerRawDataImpl> cdsFrame(
-            new lcio::TrackerRawDataImpl);
-        rawDataEncoder.setCellID(cdsFrame.get());
-
-        // add the cds stripped values to the current TrackerRawData
-        cdsFrame->setADCValues(cdsStrippedVec);
-
-        // put the pivot pixel in the timestamp field of the
-        // TrackerRawData. I know that is not correct, but this is
-        // the only place where I can put this info
-        cdsFrame->setTime(plane.PivotPixel());
-
-        // this is also the right place to add the pivot pixel to
-        // the pivot pixel vector for synchronization checks
-        pivotPixelPosVec.push_back(plane.PivotPixel());
-
-        // now append the TrackerRawData object to the corresponding
-        // collection releasing the auto pointer
-        rawDataCollection->push_back(cdsFrame.release());
-      }
-
-      delete currentDetector;
+     
     }
+#if USE_EUTELESCOPE
+      if (result.getEventNumber() == 0) {
 
-    if (result.getEventNumber() == 0) {
+	// do this only in the first event
 
-      // do this only in the first event
-
-      LCCollectionVec *eudrbSetupCollection = NULL;
-      bool eudrbSetupExists = false;
-      try {
-        eudrbSetupCollection =
+	LCCollectionVec *eudrbSetupCollection = NULL;
+	bool eudrbSetupExists = false;
+	try {
+	  eudrbSetupCollection =
             static_cast<LCCollectionVec *>(result.getCollection("eudrbSetup"));
-        eudrbSetupExists = true;
-      } catch (lcio::DataNotAvailableException &e) {
-        eudrbSetupCollection = new LCCollectionVec(lcio::LCIO::LCGENERICOBJECT);
+	  eudrbSetupExists = true;
+	} catch (lcio::DataNotAvailableException &e) {
+	  eudrbSetupCollection = new LCCollectionVec(lcio::LCIO::LCGENERICOBJECT);
+	}
+
+	for (size_t iPlane = 0; iPlane < setupDescription.size(); ++iPlane) {
+	  eudrbSetupCollection->push_back(setupDescription.at(iPlane));
+	}
+
+	if (!eudrbSetupExists) {
+	  result.addCollection(eudrbSetupCollection, "eudrbSetup");
+	}
       }
-
-      for (size_t iPlane = 0; iPlane < setupDescription.size(); ++iPlane) {
-        eudrbSetupCollection->push_back(setupDescription.at(iPlane));
-      }
-
-      if (!eudrbSetupExists) {
-        result.addCollection(eudrbSetupCollection, "eudrbSetup");
-      }
-    }
-
-    // check if all the boards where running in synchronous mode or
-    // not. Remember that the last pivot pixel entry is the one of the
-    // master board.
-    std::vector<size_t>::iterator masterBoardPivotAddress =
-        pivotPixelPosVec.end() - 1;
-    std::vector<size_t>::iterator slaveBoardPivotAddress =
-        pivotPixelPosVec.begin();
-    while (slaveBoardPivotAddress < masterBoardPivotAddress) {
-      if (*slaveBoardPivotAddress - *masterBoardPivotAddress >= 2) {
-        outOfSyncFlag = true;
-
-        // we don't need to continue looping over all boards if one of
-        // them is already out of sync
-        break;
-      }
-      ++slaveBoardPivotAddress;
-    }
-    if (outOfSyncFlag) {
-
-      if (result.getEventNumber() < 20) {
-        // in this case we have the responsibility to tell the user that
-        // the event was out of sync
-        std::cout << "Event number " << result.getEventNumber()
-                  << " seems to be out of sync" << std::endl;
-        std::vector<size_t>::iterator masterBoardPivotAddress =
-            pivotPixelPosVec.end() - 1;
-        std::vector<size_t>::iterator slaveBoardPivotAddress =
-            pivotPixelPosVec.begin();
-        while (slaveBoardPivotAddress < masterBoardPivotAddress) {
-          // print out all the slave boards first
-          std::cout << " --> Board (S) " << std::setw(3)
-                    << setiosflags(std::ios::right)
-                    << slaveBoardPivotAddress - pivotPixelPosVec.begin()
-                    << resetiosflags(std::ios::right) << " = " << std::setw(15)
-                    << setiosflags(std::ios::right) << (*slaveBoardPivotAddress)
-                    << resetiosflags(std::ios::right) << " (" << std::setw(15)
-                    << setiosflags(std::ios::right)
-                    << (signed)(*masterBoardPivotAddress) -
-                           (signed)(*slaveBoardPivotAddress)
-                    << resetiosflags(std::ios::right) << ")" << std::endl;
-          ++slaveBoardPivotAddress;
-        }
-        // print out also the master. It is impossible that the master
-        // is out of sync with respect to itself, but for completeness...
-        std::cout << " --> Board (M) " << std::setw(3)
-                  << setiosflags(std::ios::right)
-                  << slaveBoardPivotAddress - pivotPixelPosVec.begin()
-                  << resetiosflags(std::ios::right) << " = " << std::setw(15)
-                  << setiosflags(std::ios::right) << (*slaveBoardPivotAddress)
-                  << resetiosflags(std::ios::right) << " (" << std::setw(15)
-                  << setiosflags(std::ios::right)
-                  << (signed)(*masterBoardPivotAddress) -
-                         (signed)(*slaveBoardPivotAddress)
-                  << resetiosflags(std::ios::right) << ")" << std::endl;
-
-      } else if (result.getEventNumber() == 20) {
-        // if the number of consecutive warnings is equal to the maximum
-        // allowed, don't bother the user anymore with this message,
-        // because it's very likely the run was taken unsynchronized on
-        // purpose
-        std::cout
-            << "The maximum number of unsychronized events has been reached."
-            << std::endl
-            << "Assuming the run was taken in asynchronous mode" << std::endl;
-      }
-    }
-
-    // add the collections to the event only if not empty and not yet there
-    if (!rawDataCollectionExists) {
-      if (rawDataCollection->size() != 0)
-        result.addCollection(rawDataCollection, "rawdata");
-      else
-        delete rawDataCollection; // clean up if not storing the collection here
-    }
-
-    if (!zsDataCollectionExists) {
-      if (zsDataCollection->size() != 0)
-        result.addCollection(zsDataCollection, "zsdata");
-      else
-        delete zsDataCollection; // clean up if not storing the collection here
-    }
-
-    if (!zs2DataCollectionExists) {
-      if (zs2DataCollection->size() != 0)
-        result.addCollection(zs2DataCollection, "zsdata_m26");
-      else
-        delete zs2DataCollection; // clean up if not storing the collection here
-    }
-
-    return true;
-  }
-
 #endif
 
+      // add the collections to the event only if not empty and not yet there
+      if (!rawDataCollectionExists) {
+        if (rawDataCollection->size() != 0)
+          result.addCollection(rawDataCollection, "rawdata");
+        else
+          delete rawDataCollection; // clean up if not storing the collection here
+      }
+
+      if (!zsDataCollectionExists) {
+        if (zsDataCollection->size() != 0)
+          result.addCollection(zsDataCollection, "zsdata");
+        else
+          delete zsDataCollection; // clean up if not storing the collection here
+      }
+
+      if (!zs2DataCollectionExists) {
+        if (zs2DataCollection->size() != 0)
+          result.addCollection(zs2DataCollection, "zsdata_m26");
+        else
+          delete zs2DataCollection; // clean up if not storing the collection here
+      }
+
+      return true;
+    }
+  
+  
+#endif
+  
 } // namespace eudaq
