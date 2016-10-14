@@ -97,8 +97,8 @@ namespace eudaq {
        	const RawDataEvent::data_t & bl2 = rawev->GetBlock(nblock++);
        	time_t timestamp = *(unsigned int *)(&bl2[0]);
 
-	IMPL::LCEventImpl  & lcevent = dynamic_cast<IMPL::LCEventImpl&>(result);
-	lcevent.setTimeStamp((long int)&bl2[0]);
+	//	IMPL::LCEventImpl  & lcevent = dynamic_cast<IMPL::LCEventImpl&>(result);
+	//	lcevent.setTimeStamp((long int)&bl2[0]);
 
 	if ( colName ==  "EUDAQDataBIF") {
 	  //-------------------
@@ -148,6 +148,18 @@ namespace eudaq {
 	    LCCollectionVec *col = 0;
 	    col=createCollectionVec(result,"TempSensor", "i:LDA,i:port,i:T1,i:T2,i:T3,i:T4,i:T5,i:T6,i:TDIF,i:TPWR", timestamp, DAQquality);
 	    getScCALTemperatureSubEvent(bl5, col);  
+	  }
+
+	  // //-------------------
+	  // // READ/WRITE Timestamps
+	  // //the  block=6, if non empty, 
+	  const RawDataEvent::data_t & bl6 = rawev->GetBlock(nblock++);
+	  if(bl6.size()==0)   cout << "Nothing in Timestamps collection..." << endl;
+	  if(bl6.size()>0) {
+	    cout << "Looking for Timestamps collection..." << endl;
+	    LCCollectionVec *col = 0;
+	    col=createCollectionVec(result,"TimeStamps", "Start:Stop:BusyOn:BusyOff:Trig", timestamp, DAQquality);
+	    getDataLCIOGenericObject(bl6,col,nblock);
 	  }
 
 	  // READ BLOCKS WITH DATA

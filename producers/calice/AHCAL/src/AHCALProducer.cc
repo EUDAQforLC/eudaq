@@ -173,7 +173,15 @@ namespace eudaq {
 
   deque<eudaq::RawDataEvent *>  AHCALProducer::sendallevents(deque<eudaq::RawDataEvent *> deqEvent, int minimumsize) { 
     while(deqEvent.size() > minimumsize){
-      SendEvent(*(deqEvent.front()));
+      
+      RawDataEvent *ev = deqEvent.front();
+      // int TriggerValidated = from_string(ev->GetTag("TriggerValidated"),-1);
+      //   if(TriggerValidated == 1 )    {
+      cout<< "send eventN="<<ev->GetEventNumber() <<" ?, it has"<< ev->NumBlocks() <<" Blocks"<<endl;
+      if( ev->NumBlocks()>7 )    {
+	SendEvent(*(deqEvent.front()));
+	cout<< "send eventN="<<ev->GetEventNumber() << endl;
+      }
       delete deqEvent.front();
       deqEvent.pop_front();
     }

@@ -18,8 +18,9 @@ namespace eudaq {
   void ScReader::OnStart(int runNo){
     _runNo = runNo;
     _cycleNo = -1;
+    _trigID = 0;
     _tempmode = false;
-    
+    cycleData.resize(3);
     // set the connection and send "start runNo"
     _producer->OpenConnection();
 
@@ -140,24 +141,54 @@ namespace eudaq {
  
     	// for the temperature data we should ignore the cycle # because it's invalid.
     	bool TempFlag = (status == 0xa0 && buf[10] == 0x41 && buf[11] == 0x43 && buf[12] == 0x7a && buf[13] == 0);
+    	bool TimestampFlag = (status == 0x08 && buf[10] == 0x45 && buf[11] == 0x4D && buf[12] == 0x49 && buf[13] == 0x54);
+	unsigned char TStype=0;
 
+	if(TimestampFlag) TStype= buf[14];
   
-	deqEvent = NewEvent_createRawDataEvent(deqEvent, TempFlag, cycle);
-        
-	if(slowcontrol.size()>0  ) {
-	  AppendBlockGeneric(deqEvent,3,slowcontrol);
-	  slowcontrol.clear();
-	}
-
-	if(ledInfo.size()>0 ) {
-	  AppendBlockGeneric(deqEvent,4,ledInfo);
-	  ledInfo.clear();
-	}
-
 	if(TempFlag == true )
 	  readTemperature(buf);
-	else if (_vecTemp.size()>0) AppendBlockTemperature(deqEvent,5);
 
+	if( TimestampFlag ){ 
+	  
+	  deqEvent = NewEvent_createRawDataEvent(deqEvent, TempFlag, cycle);
+	  
+	  if(slowcontrol.size()>0  ) {
+	    AppendBlockGeneric(deqEvent,3,slowcontrol);
+	    slowcontrol.clear();
+	  }
+	  
+	  if(ledInfo.size()>0 ) {
+	    AppendBlockGeneric(deqEvent,4,ledInfo);
+	    ledInfo.clear();
+	  }
+	  
+	  if (_vecTemp.size()>0) AppendBlockTemperature(deqEvent,5);
+
+	  uint64_t timestamp = (  (unsigned char)buf[18] + ((unsigned char)buf[19] << 8) + ((unsigned char)buf[20] << 16) + ((unsigned char)buf[21] << 24) + ((unsigned char)buf[22] << 32)  + ((unsigned char)buf[23] << 40) ) ;
+	  
+	  if(TStype == 0x01) { cycleData[0]=timestamp; cout<<"cycleData[0]="<< cycleData[0]<<endl;}// start acq
+	  if(TStype == 0x02) { cycleData[1]=timestamp; cout<<"cycleData[1]="<< cycleData[1]<<endl;} // stop acq
+	  //if(TStype == 0x20) cycleData[2]=timestamp; // busy on
+	  // if(TStype == 0x21) cycleData[3]=timestamp; // busy off
+	  if(TStype == 0x10) { cycleData[2]=timestamp; cout<<"cycleData[2]="<< cycleData[2]<<endl;} // newtrigger
+	  
+	  if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
+	    cout<<"AppendBlock Timestamps"<<endl;
+	    AppendBlockGeneric_64(deqEvent,6,cycleData);
+	    cycleData.clear();
+	    cycleData.resize(3);
+	  }
+	  
+	  
+	  if( TStype == 0x10){   
+	    _trigID++;
+	    RawDataEvent *ev = deqEvent.back();
+	    ev->SetTag("TriggerValidated",1);
+	    cout<< "cycle= " <<_cycleNo << " trig= "<<_trigID<<endl;
+	    
+	  }
+	}
 
 	if(!(status & 0x40)){
     	  //We'll drop non-data packet;
@@ -188,96 +219,102 @@ namespace eudaq {
   std::deque<eudaq::RawDataEvent *> ScReader::NewEvent_createRawDataEvent(std::deque<eudaq::RawDataEvent *>  deqEvent, bool TempFlag, int cycle)
   {
 
-    if( deqEvent.size()==0 || (!TempFlag && ((_cycleNo +256) % 256) != cycle)  ){
-      // new event arrived: create RawDataEvent
-      _cycleNo ++;
-      RawDataEvent *nev = new RawDataEvent("CaliceObject", _runNo, _cycleNo);
-      string s = "EUDAQDataScCAL";
-      nev->AddBlock(0,s.c_str(), s.length());
-      s = "i:CycleNr,i:BunchXID,i:EvtNr,i:ChipID,i:NChannels,i:TDC14bit[NC],i:ADC14bit[NC]";
-      nev->AddBlock(1,s.c_str(), s.length());
-      unsigned int times[1];
-      struct timeval tv;
-      ::gettimeofday(&tv, NULL);
-      times[0] = tv.tv_sec;
-      nev->AddBlock(2, times, sizeof(times));
-      nev->AddBlock(3, vector<int>()); // dummy block to be filled later with slowcontrol files
-      nev->AddBlock(4, vector<int>()); // dummy block to be filled later with LED information (only if LED run)
-      nev->AddBlock(5, vector<int>()); // dummy block to be filled later with temperature
+    if( deqEvent.size()==0 || (( _cycleNo +256 ) % 256) != cycle)  { //probar las dos
+    // new event arrived: create RawDataEvent
+    _cycleNo ++;
+    RawDataEvent *nev = new RawDataEvent("CaliceObject", _runNo, _trigID);
+    string s = "EUDAQDataScCAL";
+    nev->AddBlock(0,s.c_str(), s.length());
+    s = "i:CycleNr,i:BunchXID,i:EvtNr,i:ChipID,i:NChannels,i:TDC14bit[NC],i:ADC14bit[NC]";
+    nev->AddBlock(1,s.c_str(), s.length());
+    unsigned int times[1];
+    struct timeval tv;
+    ::gettimeofday(&tv, NULL);
+    times[0] = tv.tv_sec;
+    nev->AddBlock(2, times, sizeof(times));
+    nev->AddBlock(3, vector<int>()); // dummy block to be filled later with slowcontrol files
+    nev->AddBlock(4, vector<int>()); // dummy block to be filled later with LED information (only if LED run)
+    nev->AddBlock(5, vector<int>()); // dummy block to be filled later with temperature
+    nev->AddBlock(6, vector<uint64_t>()); // dummy block to be filled later with temperature
 
-
-     if( (length - 12) % 146 ) {
-	//we check, that the data packets from DIF have proper sizes. The RAW packet size can be checked 
-	// by complying this condition:  
-	EUDAQ_WARN("Wrong LDA packet length = " + to_string(length)+ "in Run=" +to_string(_runNo) + " ,cycle= "+ to_string(_cycleNo));
-	nev->SetTag("DAQquality",0);
-     } else 
-       nev->SetTag("DAQquality",1);
+    nev->SetTag("DAQquality",1);
+    nev->SetTag("TriggerValidated",0);
      
-      deqEvent.push_back(nev);
+    deqEvent.push_back(nev);
       
  
-    } 
-    return deqEvent;
-  }
+  } 
+  return deqEvent;
+}
 
-  void ScReader::readTemperature(std::deque<char> buf)
-  {
+void ScReader::readTemperature(std::deque<char> buf)
+{
       
-    int lda = buf[6];
-    int port = buf[7];
-    short data = ((unsigned char)buf[23] << 8) + (unsigned char)buf[22];
+  int lda = buf[6];
+  int port = buf[7];
+  short data = ((unsigned char)buf[23] << 8) + (unsigned char)buf[22];
       
-    _vecTemp.push_back(make_pair(make_pair(lda,port),data));
+  _vecTemp.push_back(make_pair(make_pair(lda,port),data));
+}
+
+
+void ScReader::AppendBlockGeneric(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, vector<int> intVector)
+
+{
+  RawDataEvent *ev = deqEvent.back();
+  ev->AppendBlock(nb, intVector);
+}
+
+void ScReader::AppendBlockGeneric_64(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, vector<uint64_t> intVector)
+
+{
+  RawDataEvent *ev = deqEvent.back();
+  ev->AppendBlock(nb, intVector);
+}
+
+
+void ScReader::AppendBlockTemperature(std::deque<eudaq::RawDataEvent *> deqEvent, int nb)
+
+{
+
+  // tempmode finished; store to the rawdataevent 
+  RawDataEvent *ev = deqEvent.back();
+  vector<int> output;
+  for(unsigned int i=0;i<_vecTemp.size();i++){
+    int lda,port,data;
+    lda = _vecTemp[i].first.first;
+    port = _vecTemp[i].first.second;
+    data = _vecTemp[i].second;
+    output.push_back(lda);
+    output.push_back(port);
+    output.push_back(data);
   }
 
-
-  void ScReader::AppendBlockGeneric(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, vector<int> intVector)
-
-  {
-    RawDataEvent *ev = deqEvent.back();
-    ev->AppendBlock(nb, intVector);
-  }
-
-
-  void ScReader::AppendBlockTemperature(std::deque<eudaq::RawDataEvent *> deqEvent, int nb)
-
-  {
-
-    // tempmode finished; store to the rawdataevent 
-    RawDataEvent *ev = deqEvent.back();
-    vector<int> output;
-    for(unsigned int i=0;i<_vecTemp.size();i++){
-      int lda,port,data;
-      lda = _vecTemp[i].first.first;
-      port = _vecTemp[i].first.second;
-      data = _vecTemp[i].second;
-      output.push_back(lda);
-      output.push_back(port);
-      output.push_back(data);
-    }
-
-    ev->AppendBlock(nb, output);
-    _tempmode = false;
-    output.clear();
-    _vecTemp.clear();
+  ev->AppendBlock(nb, output);
+  _tempmode = false;
+  output.clear();
+  _vecTemp.clear();
     
-  }
+}
 
 
-  bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *>  deqEvent)
-  {
+bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *>  deqEvent)
+{
 
-    RawDataEvent *ev = deqEvent.back();
-    deque<char>::iterator it = buf.begin() + e_sizeLdaHeader;
+  RawDataEvent *ev = deqEvent.back();
+
+  deque<char>::iterator it = buf.begin() + e_sizeLdaHeader;
      
-    // footer check: ABAB
-    if((unsigned char)it[length-2] != 0xab || (unsigned char)it[length-1] != 0xab) {
-      cout << "Footer abab invalid:" << (unsigned int)(unsigned char)it[length-2] << " " << (unsigned int)(unsigned char)it[length-1] << endl;
-      EUDAQ_WARN("Footer abab invalid:" + to_string((unsigned int)(unsigned char)it[length-2]) + " " + 
-		 to_string((unsigned int)(unsigned char)it[length-1]) ); 
-    }
+  // footer check: ABAB
+  if((unsigned char)it[length-2] != 0xab || (unsigned char)it[length-1] != 0xab) {
+    cout << "Footer abab invalid:" << (unsigned int)(unsigned char)it[length-2] << " " << (unsigned int)(unsigned char)it[length-1] << endl;
+    EUDAQ_WARN("Footer abab invalid:" + to_string((unsigned int)(unsigned char)it[length-2]) + " " + 
+	       to_string((unsigned int)(unsigned char)it[length-1]) ); 
+  }
     
+  int TriggerValidated = from_string(ev->GetTag("TriggerValidated"),-1);
+  if(TriggerValidated == 1 )   {
+
     int chipId = (unsigned char)it[length-3] * 256 + (unsigned char)it[length-4];
 
     const int NChannel = 36;
@@ -318,9 +355,18 @@ namespace eudaq {
 
       if(infodata.size()>0)  ev->AddBlock(ev->NumBlocks(), infodata);
 
+      if( (length - 12) % 146 ) {
+	//we check, that the data packets from DIF have proper sizes. The RAW packet size can be checked 
+	// by complying this condition:  
+	EUDAQ_WARN("Wrong LDA packet length = " + to_string(length)+ "in Run=" +to_string(_runNo) + " ,cycle= "+ to_string(_cycleNo));
+	ev->SetTag("DAQquality",0);
+      } 
+
     }
-    return true;
+
   }
+  return true;
+}
 
   
 }
