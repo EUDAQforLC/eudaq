@@ -175,8 +175,6 @@ namespace eudaq {
     while(deqEvent.size() > minimumsize){
       
       RawDataEvent *ev = deqEvent.front();
-      // int TriggerValidated = from_string(ev->GetTag("TriggerValidated"),-1);
-      //   if(TriggerValidated == 1 )    {
       cout<< "send eventN="<<ev->GetEventNumber() <<" ?, it has"<< ev->NumBlocks() <<" Blocks"<<endl;
       if( ev->NumBlocks()>7 )    {
 	SendEvent(*(deqEvent.front()));

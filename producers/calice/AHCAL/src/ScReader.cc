@@ -167,27 +167,18 @@ namespace eudaq {
 
 	  uint64_t timestamp = (  (unsigned char)buf[18] + ((unsigned char)buf[19] << 8) + ((unsigned char)buf[20] << 16) + ((unsigned char)buf[21] << 24) + ((unsigned char)buf[22] << 32)  + ((unsigned char)buf[23] << 40) ) ;
 	  
-	  if(TStype == 0x01) { cycleData[0]=timestamp; cout<<"cycleData[0]="<< cycleData[0]<<endl;}// start acq
-	  if(TStype == 0x02) { cycleData[1]=timestamp; cout<<"cycleData[1]="<< cycleData[1]<<endl;} // stop acq
+	  if(TStype == 0x01)  cycleData[0]=timestamp; //cout<<"cycleData[0]="<< cycleData[0]<<endl;}// start acq
+	  if(TStype == 0x02)  cycleData[1]=timestamp; //cout<<"cycleData[1]="<< cycleData[1]<<endl;} // stop acq
 	  //if(TStype == 0x20) cycleData[2]=timestamp; // busy on
 	  // if(TStype == 0x21) cycleData[3]=timestamp; // busy off
-	  if(TStype == 0x10) { cycleData[2]=timestamp; cout<<"cycleData[2]="<< cycleData[2]<<endl;} // newtrigger
-	  
-	  if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
-	    cout<<"AppendBlock Timestamps"<<endl;
-	    AppendBlockGeneric_64(deqEvent,6,cycleData);
-	    cycleData.clear();
-	    cycleData.resize(3);
-	  }
-	  
-	  
-	  if( TStype == 0x10){   
-	    _trigID++;
+	  if(TStype == 0x10)  {
+	    cycleData[2]=timestamp;// cout<<"cycleData[2]="<< cycleData[2]<<endl;} // newtrigger\
+	    _trigID ++;
 	    RawDataEvent *ev = deqEvent.back();
-	    ev->SetTag("TriggerValidated",1);
-	    cout<< "cycle= " <<_cycleNo << " trig= "<<_trigID<<endl;
-	    
+            ev->SetTag("TriggerValidated",1);
+	    cout<< "cycle= " <<_cycleNo << " trig= "<< _trigID <<endl;
 	  }
+	  
 	}
 
 	if(!(status & 0x40)){
@@ -206,7 +197,15 @@ namespace eudaq {
 	  continue;
 	}
 
-	if(readSpirocData_AddBlock(buf,deqEvent)==false) continue;
+	if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
+	  //  cout<<"AppendBlock Timestamps"<<endl;                                                                                                                                    
+	  AppendBlockGeneric_64(deqEvent,6,cycleData);
+	  cycleData[0] = 0;
+	  cycleData[1] = 0;
+	  cycleData[2] = 0;
+	  
+	  if(readSpirocData_AddBlock(buf,deqEvent)==false) continue;
+	}
     	
 	// remove used buffer
     	buf.erase(buf.begin(), buf.begin() + length + e_sizeLdaHeader);
@@ -312,10 +311,7 @@ bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::R
 	       to_string((unsigned int)(unsigned char)it[length-1]) ); 
   }
     
-  int TriggerValidated = from_string(ev->GetTag("TriggerValidated"),-1);
-  if(TriggerValidated == 1 )   {
-
-    int chipId = (unsigned char)it[length-3] * 256 + (unsigned char)it[length-4];
+  int chipId = (unsigned char)it[length-3] * 256 + (unsigned char)it[length-4];
 
     const int NChannel = 36;
     int nscai = (length-8) / (NChannel * 4 + 2);
@@ -364,7 +360,7 @@ bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::R
 
     }
 
-  }
+    
   return true;
 }
 
