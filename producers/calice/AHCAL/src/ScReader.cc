@@ -172,13 +172,21 @@ namespace eudaq {
 	  //if(TStype == 0x20) cycleData[2]=timestamp; // busy on
 	  // if(TStype == 0x21) cycleData[3]=timestamp; // busy off
 	  if(TStype == 0x10)  {
-	    cycleData[2]=timestamp;// cout<<"cycleData[2]="<< cycleData[2]<<endl;} // newtrigger\
-	    _trigID ++;
+	    cycleData[2]=timestamp; //trigger
 	    RawDataEvent *ev = deqEvent.back();
             ev->SetTag("TriggerValidated",1);
-	    cout<< "cycle= " <<_cycleNo << " trig= "<< _trigID <<endl;
+	    cout<< "ScReader:, trigger id received in cycle= " <<_cycleNo << " trig= "<< _trigID <<endl;
+	    _trigID++;
 	  }
 	  
+	}
+
+	if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
+	  //  cout<<"AppendBlock Timestamps"<<endl;                                                                                                                                    
+	  AppendBlockGeneric_64(deqEvent,6,cycleData);
+	  cycleData[0] = 0;
+	  cycleData[1] = 0;
+	  cycleData[2] = 0;
 	}
 
 	if(!(status & 0x40)){
@@ -197,15 +205,11 @@ namespace eudaq {
 	  continue;
 	}
 
-	if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
-	  //  cout<<"AppendBlock Timestamps"<<endl;                                                                                                                                    
-	  AppendBlockGeneric_64(deqEvent,6,cycleData);
-	  cycleData[0] = 0;
-	  cycleData[1] = 0;
-	  cycleData[2] = 0;
+	if(readSpirocData_AddBlock(buf,deqEvent)==false) continue;
+
+
+
 	  
-	  if(readSpirocData_AddBlock(buf,deqEvent)==false) continue;
-	}
     	
 	// remove used buffer
     	buf.erase(buf.begin(), buf.begin() + length + e_sizeLdaHeader);
