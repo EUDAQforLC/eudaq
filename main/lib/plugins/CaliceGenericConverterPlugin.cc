@@ -123,7 +123,7 @@ namespace eudaq {
 	  const RawDataEvent::data_t & bl3 = rawev->GetBlock(nblock++);
 
 	  if(bl3.size() > 0)  {
-	    // cout << "Looking for SlowControl collection..." << endl;
+	    cout << "Looking for SlowControl collection..." << endl;
 	    LCCollectionVec *col = 0;
 	    col=createCollectionVec(result,"SlowControl", "i:sc1,i:sc2,i:scN", timestamp, DAQquality);
 	    getDataLCIOGenericObject(bl3,col,nblock);
@@ -134,7 +134,7 @@ namespace eudaq {
 	  // //the  block=4, if non empty, contaions LED info
 	  const RawDataEvent::data_t & bl4 = rawev->GetBlock(nblock++);
 	  if(bl4.size() > 0)  {
-	    // cout << "Looking for LED voltages collection..." << endl;
+	    cout << "Looking for LED voltages collection..." << endl;
 	    LCCollectionVec *col = 0;
 	    col=createCollectionVec(result,"LEDinfo", "i:Nlayers,i:LayerID_j,i:LayerVoltage_j,i:LayerOnOff_j", timestamp, DAQquality);
 	    getDataLCIOGenericObject(bl4,col,nblock);
@@ -160,9 +160,9 @@ namespace eudaq {
 	  getDataLCIOGenericObject(rawev,col,nblock);
 
 	  const RawDataEvent::data_t & bl6 = rawev->GetBlock(6);
-	  // if(bl6.size()==0)   cout << "Nothing in Timestamps collection..." << endl;
+	  if(bl6.size()==0)   cout << "Nothing in Timestamps collection..." << endl;
 	  if(bl6.size()>0) {
-	    //  cout << "Looking for Timestamps collection..." << endl;
+	    cout << "Looking for Timestamps collection..." << endl;
 	    LCCollectionVec *col = 0;
 	    col=createCollectionVec(result,"TimeStamps", "Start:Stop:BusyOn:BusyOff:Trig", timestamp, DAQquality);
 	    getDataLCIOGenericObject(bl6,col,nblock);
@@ -180,13 +180,10 @@ namespace eudaq {
       try{
 	// looking for existing collection
 	col = dynamic_cast<IMPL::LCCollectionVec *>(result.getCollection(colName));
-	//cout << "collection found." << endl;
       }catch(DataNotAvailableException &e){
 	// create new collection
-	//cout << "Creating TempSensor collection..." << endl;
 	col = new IMPL::LCCollectionVec(LCIO::LCGENERICOBJECT);
 	result.addCollection(col,colName);
-	//  cout << "collection added." << endl;
       }
       col->parameters().setValue("DataDescription", dataDesc);
       //add timestamp (set by the Producer, is EUDAQ, not real timestamp!!)
@@ -247,7 +244,7 @@ namespace eudaq {
 	vector<int> v;
 	v.resize(bl.size() / sizeof(int));
 	memcpy(&v[0], &bl[0],bl.size());
-	if(v.size()>4) std::cout<<"TS trig conv 1 "<<v[4]<<endl;
+
 	CaliceLCGenericObject *obj = new CaliceLCGenericObject;
 	obj->setIntDataInt(v);
 	try{
