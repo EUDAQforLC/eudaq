@@ -486,7 +486,7 @@ namespace eudaq {
         zsDataEncoder.setCellID(zsFrame);
 
 	for(int i=0; i<  plane.HitPixels() ; i++) {
-	  std::cout<<plane.GetX(i)<< "    " <<plane.GetY(i)<<" "<< plane.ID()<<" "<< plane.Sensor()<<std::endl;
+	  //	  std::cout<<plane.GetX(i)<< "    " <<plane.GetY(i)<<" "<< plane.ID()<<" "<< plane.Sensor()<<std::endl;
 	  
 	  zsFrame->chargeValues().push_back(plane.GetX(i));
 	  zsFrame->chargeValues().push_back(plane.GetY(i));

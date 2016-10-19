@@ -17,10 +17,9 @@ namespace eudaq {
     virtual void readTemperature(std::deque<char> buf);
     virtual void AppendBlockTemperature(std::deque<eudaq::RawDataEvent *> deqEvent, int nb);
     virtual void AppendBlockGeneric(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, std::vector<int> intVector);
-    virtual void AppendBlockGeneric_64(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, std::vector<uint64_t> intVector);
+    virtual void AppendBlockGeneric_32(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, std::vector<uint32_t> intVector);
 
-
-    virtual bool readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *> deqEvent);
+    virtual void readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *> deqEvent);
     
     ScReader(AHCALProducer *r) : AHCALReader(r) {_runNo = -1;}
     ~ScReader(){}
@@ -36,7 +35,7 @@ namespace eudaq {
     std::vector< std::pair<std::pair<int,int>, int> > _vecTemp; // (lda, port), data;
     std::vector<int> slowcontrol;
     std::vector<int> ledInfo;
-    std::vector<uint64_t> cycleData;
+    std::vector<uint32_t> cycleData;
    
   };
 }

@@ -27,7 +27,7 @@ namespace eudaq {
     virtual bool GetLCIOSubEvent(lcio::LCEvent &result,
                                  const eudaq::Event &source) const {
       dynamic_cast<lcio::LCEventImpl &>(result)
-          .setTimeStamp(source.GetTimestamp());
+	.setTimeStamp(source.GetTimestamp());
       dynamic_cast<lcio::LCEventImpl &>(result)
           .setEventNumber(source.GetEventNumber());
       dynamic_cast<lcio::LCEventImpl &>(result)

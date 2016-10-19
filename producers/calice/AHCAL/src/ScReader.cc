@@ -20,7 +20,7 @@ namespace eudaq {
     _cycleNo = -1;
     _trigID = 0;
     _tempmode = false;
-    cycleData.resize(3);
+    cycleData.resize(6);
     // set the connection and send "start runNo"
     _producer->OpenConnection();
 
@@ -137,8 +137,8 @@ namespace eudaq {
 	}
 	
     	unsigned int cycle = (unsigned char)buf[4];
-    	unsigned char status = buf[9];
- 
+    	unsigned char status = buf[9]; 
+
     	// for the temperature data we should ignore the cycle # because it's invalid.
     	bool TempFlag = (status == 0xa0 && buf[10] == 0x41 && buf[11] == 0x43 && buf[12] == 0x7a && buf[13] == 0);
     	bool TimestampFlag = (status == 0x08 && buf[10] == 0x45 && buf[11] == 0x4D && buf[12] == 0x49 && buf[13] == 0x54);
@@ -149,7 +149,7 @@ namespace eudaq {
 	if(TempFlag == true )
 	  readTemperature(buf);
 
-	if( TimestampFlag ){ 
+	if( TimestampFlag && (TStype!=0x20 && TStype!=0x21) ){ 
 	  
 	  deqEvent = NewEvent_createRawDataEvent(deqEvent, TempFlag, cycle);
 	  
@@ -165,28 +165,35 @@ namespace eudaq {
 	  
 	  if (_vecTemp.size()>0) AppendBlockTemperature(deqEvent,5);
 
-	  uint64_t timestamp = (  (unsigned char)buf[18] + ((unsigned char)buf[19] << 8) + ((unsigned char)buf[20] << 16) + ((unsigned char)buf[21] << 24) + ((unsigned char)buf[22] << 32)  + ((unsigned char)buf[23] << 40) ) ;
+	  uint64_t timestamp = (  (uint64_t)((unsigned char)buf[18]) + 
+				  (((uint64_t)((unsigned char)buf[19])) << 8) + 
+				  (((uint64_t)((unsigned char)buf[20])) << 16) + 
+				  (((uint64_t)((unsigned char)buf[21])) << 24) + 
+				  (((uint64_t)((unsigned char)buf[22])) << 32) + 
+				  (((uint64_t)((unsigned char)buf[23])) << 40) );
 	  
-	  if(TStype == 0x01)  cycleData[0]=timestamp; //cout<<"cycleData[0]="<< cycleData[0]<<endl;}// start acq
-	  if(TStype == 0x02)  cycleData[1]=timestamp; //cout<<"cycleData[1]="<< cycleData[1]<<endl;} // stop acq
-	  //if(TStype == 0x20) cycleData[2]=timestamp; // busy on
-	  // if(TStype == 0x21) cycleData[3]=timestamp; // busy off
+	  
+	  if(TStype == 0x01)  {
+	    cycleData[0]=(uint32_t)(timestamp); // start acq
+	    cycleData[1]=(uint32_t)((timestamp>>32)); // start acq
+	  }
+	  if(TStype == 0x02)  {
+	    cycleData[2]=(uint32_t)(timestamp); // stop acq
+	    cycleData[3]=(uint32_t)((timestamp>>32)); // stop acq 
+	  }
+
+	  //if(TStype == 0x20) // busy on
+	  // if(TStype == 0x21) // busy off
+
 	  if(TStype == 0x10)  {
-	    cycleData[2]=timestamp; //trigger
+	    cycleData[4]=(uint32_t)(timestamp); // trig acq
+	    cycleData[5]=(uint32_t)((timestamp>>32)); // trig
 	    RawDataEvent *ev = deqEvent.back();
             ev->SetTag("TriggerValidated",1);
-	    cout<< "ScReader:, trigger id received in cycle= " <<_cycleNo << " trig= "<< _trigID <<endl;
+	    cout<< "ScReader:, trigger id received in cycle= " <<_cycleNo << " trigCounter= "<< _trigID <<" triggerfromLDA="<<cycle<<endl;
 	    _trigID++;
 	  }
 	  
-	}
-
-	if(cycleData[0] != 0  &&  cycleData[1] != 0 && cycleData[2] != 0 ) {
-	  //  cout<<"AppendBlock Timestamps"<<endl;                                                                                                                                    
-	  AppendBlockGeneric_64(deqEvent,6,cycleData);
-	  cycleData[0] = 0;
-	  cycleData[1] = 0;
-	  cycleData[2] = 0;
 	}
 
 	if(!(status & 0x40)){
@@ -205,11 +212,19 @@ namespace eudaq {
 	  continue;
 	}
 
-	if(readSpirocData_AddBlock(buf,deqEvent)==false) continue;
+        if(cycleData[0] != 0  &&  cycleData[2] != 0 && cycleData[4] != 0 ) {
+          //  cout<<"AppendBlock Timestamps"<<endl;                                                                                                                                                                 
+          AppendBlockGeneric_32(deqEvent,6,cycleData);
+          cycleData[0] = 0;
+          cycleData[1] = 0;
+          cycleData[2] = 0;
+          cycleData[3] = 0;
+          cycleData[4] = 0;
+          cycleData[5] = 0;
+	}
 
+	if(deqEvent.size()!=0) readSpirocData_AddBlock(buf,deqEvent);
 
-
-	  
     	
 	// remove used buffer
     	buf.erase(buf.begin(), buf.begin() + length + e_sizeLdaHeader);
@@ -222,7 +237,7 @@ namespace eudaq {
   std::deque<eudaq::RawDataEvent *> ScReader::NewEvent_createRawDataEvent(std::deque<eudaq::RawDataEvent *>  deqEvent, bool TempFlag, int cycle)
   {
 
-    if( deqEvent.size()==0 || (( _cycleNo +256 ) % 256) != cycle)  { //probar las dos
+    if( deqEvent.size()==0 || (!TempFlag && (( _cycleNo +256 ) % 256) != cycle) )  { 
     // new event arrived: create RawDataEvent
     _cycleNo ++;
     RawDataEvent *nev = new RawDataEvent("CaliceObject", _runNo, _trigID);
@@ -238,7 +253,7 @@ namespace eudaq {
     nev->AddBlock(3, vector<int>()); // dummy block to be filled later with slowcontrol files
     nev->AddBlock(4, vector<int>()); // dummy block to be filled later with LED information (only if LED run)
     nev->AddBlock(5, vector<int>()); // dummy block to be filled later with temperature
-    nev->AddBlock(6, vector<uint64_t>()); // dummy block to be filled later with temperature
+    nev->AddBlock(6, vector<uint32_t>()); // dummy block to be filled later with temperature
 
     nev->SetTag("DAQquality",1);
     nev->SetTag("TriggerValidated",0);
@@ -268,13 +283,12 @@ void ScReader::AppendBlockGeneric(std::deque<eudaq::RawDataEvent *> deqEvent, in
   ev->AppendBlock(nb, intVector);
 }
 
-void ScReader::AppendBlockGeneric_64(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, vector<uint64_t> intVector)
+void ScReader::AppendBlockGeneric_32(std::deque<eudaq::RawDataEvent *> deqEvent, int nb, vector<uint32_t> intVector)
 
 {
   RawDataEvent *ev = deqEvent.back();
   ev->AppendBlock(nb, intVector);
 }
-
 
 void ScReader::AppendBlockTemperature(std::deque<eudaq::RawDataEvent *> deqEvent, int nb)
 
@@ -301,7 +315,7 @@ void ScReader::AppendBlockTemperature(std::deque<eudaq::RawDataEvent *> deqEvent
 }
 
 
-bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *>  deqEvent)
+void ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::RawDataEvent *>  deqEvent)
 {
 
   RawDataEvent *ev = deqEvent.back();
@@ -355,6 +369,7 @@ bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::R
 
       if(infodata.size()>0)  ev->AddBlock(ev->NumBlocks(), infodata);
 
+
       if( (length - 12) % 146 ) {
 	//we check, that the data packets from DIF have proper sizes. The RAW packet size can be checked 
 	// by complying this condition:  
@@ -364,8 +379,6 @@ bool ScReader::readSpirocData_AddBlock(std::deque<char> buf, std::deque<eudaq::R
 
     }
 
-    
-  return true;
 }
 
   
