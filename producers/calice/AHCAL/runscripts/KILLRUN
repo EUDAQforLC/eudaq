@@ -1,6 +1,6 @@
 #!/bin/bash
 # cleanup of DAQ
-PROCESSES="euLog euRun TestDataCollector euLog.exe euRun.exe TestDataCollector.exe AHCALProducer OnlineMon.exe caliceahcalbif_Producer.exe"
+PROCESSES="euLog euRun TestDataCollector euLog.exe euRun.exe TestDataCollector.exe AHCALProducer AHCALProducer.exe OnlineMon.exe caliceahcalbif_Producer.exe"
 for thisprocess in $PROCESSES
 do
     echo "Checking if $thisprocess is running... "

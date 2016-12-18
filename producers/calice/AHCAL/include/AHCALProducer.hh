@@ -53,9 +53,10 @@ namespace eudaq {
   private:
     int _runNo;
     int _eventNo;
-    int _fd;
+    int _fd; //handle of the TCP socket to LABVIEW
     //airqui 
     //    pthread_mutex_t _mufd;
+    //mutex for the TCP socket to LABVIEW
     std::mutex _mufd;
       
     bool _running;
@@ -82,7 +83,7 @@ namespace eudaq {
 
     std::time_t _last_readout_time; //last time when there was any data from AHCAL
 
-    std::deque<eudaq::RawDataEvent *> deqEvent;
+//    std::deque<eudaq::RawDataEvent *> deqEvent;
 
 
 
