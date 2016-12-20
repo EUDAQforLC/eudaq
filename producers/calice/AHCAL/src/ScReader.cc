@@ -111,7 +111,7 @@ namespace eudaq {
                      int ledOnOff = (unsigned char) buf[ibuf];	//led on/off
                      ledInfo.push_back(ledOnOff);
                      cout << " Layer=" << ledId << " Voltage= " << ledV << " on/off=" << ledOnOff << endl;
-                     EUDAQ_INFO(" Layer=" + to_string(ledId) + " Voltage=" + to_string(ledV) + " on/off=" + to_string(ledOnOff));
+                     EUDAQ_EXTRA(" Layer=" + to_string(ledId) + " Voltage=" + to_string(ledV) + " on/off=" + to_string(ledOnOff));
                   }
                   buf.pop_front();
                }

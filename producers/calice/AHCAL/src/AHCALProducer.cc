@@ -68,7 +68,7 @@ namespace eudaq {
 
    void AHCALProducer::OnStartRun(unsigned param) {
       _runNo = param;
-      _eventNo = 0;
+      _eventNo = -1;
       // raw file open
       if (_writeRaw) OpenRawFile(param, _writerawfilename_timestamp);
 
@@ -187,8 +187,22 @@ namespace eudaq {
    deque<eudaq::RawDataEvent *> AHCALProducer::sendallevents(deque<eudaq::RawDataEvent *> deqEvent, int minimumsize) {
       while (deqEvent.size() > minimumsize) {
          RawDataEvent *ev = deqEvent.front();
-         _eventNo = ev->GetEventNumber(); //save the last event number
          if (from_string(ev->GetTag("TriggerValidated"), -1) == 1) {
+            if (ev->GetEventNumber() != (_eventNo + 1)) {
+               EUDAQ_WARN(" Event " + to_string(ev->GetEventNumber()) + " Not in sequence. Expected " + to_string(_eventNo + 1));
+
+	       //fix for a problem of 2 triggers, that came in the same ROC
+	       if (ev->GetEventNumber() == (_eventNo + 2)) {
+		 EUDAQ_WARN(" Sending event " + to_string(ev->GetEventNumber()) + " twice");
+		 SendEvent(*(deqEvent.front()));
+	       } else {
+		 int jump = (ev->GetEventNumber() - (_eventNo + 1));
+		 EUDAQ_ERROR("Cannot be fixed by sending the packet twice. More complex problem. Not possible to fix a jump of by " + to_string(jump) );
+	       }
+            }
+
+	    
+            _eventNo = ev->GetEventNumber(); //save the last event number
             SendEvent(*(deqEvent.front()));
             if (from_string(ev->GetTag("TriggerInvalid"), -1) == 1) {
                cout << "Send DUMMY eventN=" << ev->GetEventNumber() << " with " << ev->NumBlocks() << " Blocks, and TriggerTag=" << from_string(ev->GetTag("TriggerValidated"), -1) << endl;

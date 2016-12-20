@@ -52,7 +52,7 @@ namespace eudaq {
       
   private:
     int _runNo;
-    int _eventNo;
+    int _eventNo; //last stored event
     int _fd; //handle of the TCP socket to LABVIEW
     //airqui 
     //    pthread_mutex_t _mufd;

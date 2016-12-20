@@ -13,9 +13,10 @@ else
     sh KILLRUN
 fi
 
+cd $DATADIR
 
 printf '\033[22;33m\t  caliceProducer-scintillator  \033[0m \n'
-$EUDAQBIN/AHCALProducer -n CaliceSc -r tcp://$HOSTIP:$RCPORT &
+$EUDAQBIN/AHCALProducer -n CaliceSc -r tcp://$HOSTIP:$RCPORT | tee $EUDAQDIR/logs/calice_ahcal_producer.log&
 #-r tcp://$HOSTIP:$RCPORT &
 sleep 3
 
