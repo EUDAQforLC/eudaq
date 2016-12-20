@@ -189,7 +189,7 @@ namespace eudaq {
          RawDataEvent *ev = deqEvent.front();
          if (from_string(ev->GetTag("TriggerValidated"), -1) == 1) {
             if (ev->GetEventNumber() != (_eventNo + 1)) {
-               EUDAQ_WARN(" Event " + to_string(ev->GetEventNumber()) + " Not in sequence. Expected " + to_string(_eventNo + 1));
+	      EUDAQ_WARN("Run "+to_string(_runNo)+" Event " + to_string(ev->GetEventNumber()) + " not in sequence. Expected " + to_string(_eventNo + 1));
 
 	       //fix for a problem of 2 triggers, that came in the same ROC
 	       if (ev->GetEventNumber() == (_eventNo + 2)) {
@@ -197,7 +197,7 @@ namespace eudaq {
 		 SendEvent(*(deqEvent.front()));
 	       } else {
 		 int jump = (ev->GetEventNumber() - (_eventNo + 1));
-		 EUDAQ_ERROR("Cannot be fixed by sending the packet twice. More complex problem. Not possible to fix a jump of by " + to_string(jump) );
+		 EUDAQ_ERROR("Run "+to_string(_runNo)+" Event "+ to_string(ev->GetEventNumber()) + " cannot be fixed by sending the packet twice. Problem more complex, which is not possible to fix a jump by " + to_string(jump) );
 	       }
             }
 
